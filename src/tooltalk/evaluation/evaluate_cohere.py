@@ -13,18 +13,20 @@ from enum import Enum
 from typing import List
 
 import openai
+import requests
 from tqdm import tqdm
 
 from tooltalk.apis import ALL_APIS, APIS_BY_NAME
 from tooltalk.evaluation.tool_executor import BaseAPIPredictor, ToolExecutor
 from tooltalk.utils.file_utils import get_names_and_paths
-from tooltalk.utils.openai_utils import openai_chat_completion
+
+# from tooltalk.utils.openai_utils import openai_chat_completion
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class OpenAIPredictor(BaseAPIPredictor):
+class CohereAIPredictor(BaseAPIPredictor):
     system_prompt = "You are a helpful assistant. Here is some user data:" \
                     "\nlocation: {location}" \
                     "\ntimestamp: {timestamp}" \
@@ -83,13 +85,24 @@ class OpenAIPredictor(BaseAPIPredictor):
         print("num functions:", len(self.api_docs))
         # for function in self.api_docs:
         #     print(json.dumps(function, indent=4))
-        openai_response = openai_chat_completion(
-            model=self.model,
-            messages=openai_history,
-            functions=self.api_docs,
-        )
+
+        # openai_response = openai_chat_completion(
+        #     model=self.model,
+        #     messages=openai_history,
+        #     functions=self.api_docs,
+        # )
+
+        openai_response = requests.post(f'http://144.25.31.124:8461/v1/chat/completions', json={
+                "model": self.model,
+                "messages": openai_history,
+                "functions": self.api_docs,
+            }, verify=False, proxies={
+                "http": "",
+                "https": "",
+            }).json()
+        
         print("*" * 20)
-        print("openai_response:", openai_response)
+        print("openai_response:", json.dumps(openai_response, indent=4))
         logger.debug(f"OpenAI full response: {openai_response}")
         openai_message = openai_response["choices"][0]["message"]
         metadata = {
@@ -98,7 +111,7 @@ class OpenAIPredictor(BaseAPIPredictor):
                 "messages": openai_history,
                 "functions": self.api_docs,
             },
-            "openai_response": openai_response
+            "openai_response": json.dumps(openai_response, indent=4)
         }
         if "function_call" in openai_message:
             function_call = openai_message["function_call"]
@@ -190,7 +203,7 @@ def main(flags: List[str] = None):
             else:
                 raise ValueError(f"Invalid api mode: {args.api_mode}")
 
-            predictor_func = OpenAIPredictor(
+            predictor_func = CohereAIPredictor(
                 model=args.model,
                 apis_used=apis_used,
                 disable_docs=args.disable_documentation

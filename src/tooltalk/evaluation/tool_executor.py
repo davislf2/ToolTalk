@@ -5,13 +5,13 @@ Licensed under the MIT license.
 import json
 import logging
 import os
-from typing import List
-from datetime import datetime
-from collections import deque
 from abc import ABC, abstractmethod
+from collections import deque
+from datetime import datetime
+from typing import List
 
 from tooltalk.apis import ALL_APIS
-from tooltalk.apis.account import ACCOUNT_DB_NAME, UserLogin, LogoutUser, RegisterUser
+from tooltalk.apis.account import ACCOUNT_DB_NAME, LogoutUser, RegisterUser, UserLogin
 from tooltalk.utils.file_utils import get_names_and_paths
 
 logger = logging.getLogger(__name__)
@@ -269,7 +269,11 @@ class ToolExecutor:
             self.init_conversation_state(metadata, api_history, user_data)
             predictions = list()
             current_history = ground_truth_history.copy()
+            count = 0
             while True:
+                count += 1
+                if count > 2:  # exit if it has run 2 times but cannot get results
+                    break
                 prediction = predict_func(metadata, current_history)
                 if prediction["role"] == "assistant":
                     # done with predicting apis
